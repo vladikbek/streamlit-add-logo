@@ -92,13 +92,60 @@ def get_accent_color(image, n_colors=10):
     return tuple(colors[0])
 
 def download_svg_from_url(url):
-    """Download SVG content from URL"""
+    """Download SVG content from URL with retries and fallbacks"""
+    # Embedded base64 SVG as last resort fallback (HoP logo)
+    HOP_SVG_BASE64 = """PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMCAwIDMwMCAzMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3
+LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMjM5LjA4NCAxMy41
+NjUyQzIzOS4wODQgNi4wNzMzNSAyMzMuMDAxIDAgMjI1LjQ5OCAwSDcyLjY2OTlDNjUuMTY2NiAwIDU5LjA4NCA2LjA3MzM3IDU5LjA4NCAx
+My41NjUyVjQ3LjI1OEM1OS4wODQgNTQuNzQ5OCA1My4wMDEzIDYwLjgyMzIgNDUuNDk4IDYwLjgyMzJIMTMuNTg1OUM2LjA4MjYzIDYwLjgy
+MzIgMCA2Ni44OTY1IDAgNzQuMzg4NFYyMjUuNjEyQzAgMjMzLjEwMyA2LjA4MjYzIDIzOS4xNzcgMTMuNTg1OSAyMzkuMTc3SDEwNS40OThD
+MTEzLjAwMSAyMzkuMTc3IDExOS4wODQgMjQ1LjI1IDExOS4wODQgMjUyLjc0MlYyODYuNDM1QzExOS4wODQgMjkzLjkyNyAxMjUuMTY3IDMw
+MCAxMzIuNjcgMzAwSDIyNS40OThDMjMzLjAwMSAzMDAgMjM5LjA4NCAyOTMuOTI3IDIzOS4wODQgMjg2LjQzNVYyNTMuNDIxQzIzOS4wODQg
+MjQ5LjgyMyAyNDAuNTE1IDI0Ni4zNzMgMjQzLjA2MyAyNDMuODI5TDI0My43NDMgMjQzLjE1QzI0Ni4yOTEgMjQwLjYwNiAyNDkuNzQ3IDIz
+OS4xNzcgMjUzLjM1IDIzOS4xNzdIMjg2LjQxNEMyOTMuOTE3IDIzOS4xNzcgMzAwIDIzMy4xMDMgMzAwIDIyNS42MTJWMTkxLjkxOUMzMDAg
+MTg0LjQyNyAyOTMuOTE3IDE3OC4zNTQgMjg2LjQxNCAxNzguMzU0SDI1Mi42N0MyNDUuMTY3IDE3OC4zNTQgMjM5LjA4NCAxNzIuMjggMjM5
+LjA4NCAxNjQuNzg4TDIzOS4wODQgMTM1LjIxMkMyMzkuMDg0IDEyNy43MiAyNDUuMTY3IDEyMS42NDYgMjUyLjY3IDEyMS42NDZIMjg2LjQx
+NEMyOTMuOTE3IDEyMS42NDYgMzAwIDExNS41NzMgMzAwIDEwOC4wODFWNzQuMzg4NEMzMDAgNjYuODk2NSAyOTMuOTE3IDYwLjgyMzIgMjg2
+LjQxNCA2MC44MjMySDI1Mi42N0MyNDUuMTY3IDYwLjgyMzIgMjM5LjA4NCA1NC43NDk4IDIzOS4wODQgNDcuMjU3OVYxMy41NjUyWk0yMzUu
+NTY1IDIzNS42NjNDMjM3LjgxOCAyMzMuNDEzIDIzOS4wODQgMjMwLjM2MiAyMzkuMDg0IDIyNy4xODFMMjM5LjA4NCAxOTIuODM0QzIzOS4w
+ODQgMTg1LjM0MiAyMzMuMDAxIDE3OS4yNjggMjI1LjQ5OCAxNzkuMjY4SDE5My41ODZDMTg2LjA4MyAxNzkuMjY4IDE4MCAxODUuMzQyIDE4
+MCAxOTIuODM0VjIyNS42MTJDMTgwIDIzMy4xMDMgMTg2LjA4MyAyMzkuMTc3IDE5My41ODYgMjM5LjE3N0gyMjcuMDY5QzIzMC4yNTYgMjM5
+LjE3NyAyMzMuMzEyIDIzNy45MTMgMjM1LjU2NSAyMzUuNjYzWk0xNjQuNTgyIDE3OC4zNTRDMTcyLjA4NSAxNzguMzU0IDE3OC4xNjggMTcy
+LjI4IDE3OC4xNjggMTY0Ljc4OFYxMzUuMjEyQzE3OC4xNjggMTI3LjcyIDE3Mi4wODUgMTIxLjY0NiAxNjQuNTgyIDEyMS42NDZIMTMyLjY3
+QzEyNS4xNjcgMTIxLjY0NiAxMTkuMDg0IDEyNy43MiAxMTkuMDg0IDEzNS4yMTJWMTY0Ljc4OEMxMTkuMDg0IDE3Mi4yOCAxMjUuMTY3IDE3
+OC4zNTQgMTMyLjY3IDE3OC4zNTRIMTY0LjU4MloiIGZpbGw9ImJsYWNrIi8+Cjwvc3ZnPgo="""
+    
+    # List of fallback URLs to try
+    fallback_urls = [
+        url,  # Try the original URL first
+        "https://raw.githubusercontent.com/vladikbek/streamlit-add-logo/main/hop.svg",  # GitHub fallback
+        "https://cdn.jsdelivr.net/gh/vladikbek/streamlit-add-logo@main/hop.svg"  # CDN fallback
+    ]
+    
+    # Try each URL with retries
+    for attempt_url in fallback_urls:
+        try:
+            st.info(f"Attempting to download SVG from: {attempt_url}")
+            # Configure the request with a timeout and multiple retries
+            session = requests.Session()
+            session.mount('https://', requests.adapters.HTTPAdapter(max_retries=3))
+            
+            response = session.get(attempt_url, timeout=10)
+            response.raise_for_status()  # Raise an exception for HTTP errors
+            
+            st.success(f"Successfully downloaded SVG from: {attempt_url}")
+            return response.text
+        except Exception as e:
+            st.warning(f"Failed to download from {attempt_url}: {e}")
+            continue  # Try the next URL
+    
+    # If all URLs fail, use the embedded SVG
+    st.warning("Using embedded SVG as fallback")
     try:
-        response = requests.get(url)
-        response.raise_for_status()  # Raise an exception for HTTP errors
-        return response.text
+        svg_content = base64.b64decode(HOP_SVG_BASE64).decode('utf-8')
+        return svg_content
     except Exception as e:
-        st.error(f"Error downloading SVG: {e}")
+        st.error(f"Error decoding embedded SVG: {e}")
         return None
 
 def create_colored_svg(svg_content, color):
