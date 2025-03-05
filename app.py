@@ -3,9 +3,9 @@ from PIL import Image, ImageOps, ImageDraw, ImagePath
 import numpy as np
 import io
 from sklearn.cluster import KMeans
-import os
 import requests
 import colorsys
+import base64
 
 def resize_image(image, target_size=3000):
     """Resize image to target_size x target_size without stretching"""
@@ -113,14 +113,9 @@ def create_colored_svg(svg_content, color):
     return None
 
 def svg_to_png(svg_content, size=(300, 300)):
-    """Convert SVG content to PNG using PIL"""
+    """Convert SVG content to PNG using cairosvg or fallback to PIL"""
     if not svg_content:
         return None
-    
-    # Save SVG content to a temporary file
-    temp_svg_path = "temp_colored.svg"
-    with open(temp_svg_path, 'w') as f:
-        f.write(svg_content)
     
     try:
         # Use cairosvg if available (better quality)
@@ -220,10 +215,9 @@ def svg_to_png(svg_content, size=(300, 300)):
             draw.polygon(inner_shape1, fill=(0, 0, 0, 0))
             draw.polygon(inner_shape2, fill=(0, 0, 0, 0))
     
-    finally:
-        # Clean up temporary file
-        if os.path.exists(temp_svg_path):
-            os.remove(temp_svg_path)
+    except Exception as e:
+        st.error(f"Error processing SVG: {e}")
+        return None
     
     return logo
 
@@ -242,11 +236,18 @@ def add_logo_to_image(image, logo, spacing=100):
     # Paste logo onto image, using the logo's alpha channel as mask
     result.paste(logo, position, logo)
     
+    # Convert back to RGB for JPG output
+    if result.mode == 'RGBA':
+        result = result.convert('RGB')
+    
     return result
 
 def main():
     st.title("Image Processor with Logo")
-    st.write("Upload an image to resize it to 3000x3000 and add the Hop logo")
+    st.write("Upload an image to resize it to 3000x3000 and add a logo")
+    
+    # Logo URL input
+    logo_url = st.text_input("Enter logo URL (SVG format)", "https://houseofphonk.com/hop.svg")
     
     uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
     
@@ -274,8 +275,7 @@ def main():
         # Download and prepare logo
         with st.spinner("Preparing logo..."):
             # Download SVG from URL
-            svg_url = "https://houseofphonk.com/hop.svg"
-            svg_content = download_svg_from_url(svg_url)
+            svg_content = download_svg_from_url(logo_url)
             
             if svg_content:
                 # Create colored SVG
@@ -309,14 +309,14 @@ def main():
         st.subheader("Processed Image")
         st.image(final_image, use_column_width=True)
         
-        # Allow downloading the processed image
+        # Allow downloading the processed image as JPG
         buf = io.BytesIO()
-        final_image.save(buf, format="PNG")
+        final_image.save(buf, format="JPEG", quality=95)
         st.download_button(
             label="Download Processed Image",
             data=buf.getvalue(),
-            file_name="processed_image.png",
-            mime="image/png"
+            file_name="processed_image.jpg",
+            mime="image/jpeg"
         )
 
 if __name__ == "__main__":
