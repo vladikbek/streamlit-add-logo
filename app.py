@@ -128,92 +128,29 @@ def svg_to_png(svg_content, size=(300, 300)):
             )
             logo = Image.open(io.BytesIO(png_data))
         except ImportError:
-            # Fallback to a simpler approach using PIL
-            # Create a transparent image
+            # Fallback to a simple generic shape
             logo = Image.new("RGBA", size, (0, 0, 0, 0))
             draw = ImageDraw.Draw(logo)
             
-            # Draw a simplified version of the hop logo
+            # Draw a simple shape with the accent color
             width, height = size
+            padding = width * 0.1  # 10% padding
             
-            # Scale factors
-            scale_x = width / 300
-            scale_y = height / 300
+            # Draw a rounded rectangle
+            draw.rounded_rectangle(
+                [(padding, padding), (width - padding, height - padding)],
+                radius=width * 0.2,
+                fill=(*color, 255)
+            )
             
-            # Main outer shape
-            outer_shape = [
-                # Top left corner
-                (59.084 * scale_x, 13.5652 * scale_y),
-                # Top edge to right corner
-                (239.084 * scale_x, 13.5652 * scale_y),
-                # Right edge down to first indent
-                (239.084 * scale_x, 47.258 * scale_y),
-                # Right indent
-                (252.67 * scale_x, 47.258 * scale_y),
-                (252.67 * scale_x, 60.8232 * scale_y),
-                (286.414 * scale_x, 60.8232 * scale_y),
-                (286.414 * scale_x, 74.3884 * scale_y),
-                (286.414 * scale_x, 108.081 * scale_y),
-                (286.414 * scale_x, 121.646 * scale_y),
-                (252.67 * scale_x, 121.646 * scale_y),
-                (239.084 * scale_x, 121.646 * scale_y),
-                (239.084 * scale_x, 135.212 * scale_y),
-                (239.084 * scale_x, 164.788 * scale_y),
-                (239.084 * scale_x, 178.354 * scale_y),
-                (252.67 * scale_x, 178.354 * scale_y),
-                (286.414 * scale_x, 178.354 * scale_y),
-                (286.414 * scale_x, 191.919 * scale_y),
-                (286.414 * scale_x, 225.612 * scale_y),
-                (286.414 * scale_x, 239.177 * scale_y),
-                (253.35 * scale_x, 239.177 * scale_y),
-                (243.743 * scale_x, 243.15 * scale_y),
-                (239.084 * scale_x, 253.421 * scale_y),
-                (239.084 * scale_x, 286.435 * scale_y),
-                (225.498 * scale_x, 300 * scale_y),
-                (132.67 * scale_x, 300 * scale_y),
-                (119.084 * scale_x, 286.435 * scale_y),
-                (119.084 * scale_x, 252.742 * scale_y),
-                (105.498 * scale_x, 239.177 * scale_y),
-                (13.5859 * scale_x, 239.177 * scale_y),
-                (0 * scale_x, 225.612 * scale_y),
-                (0 * scale_x, 74.3884 * scale_y),
-                (13.5859 * scale_x, 60.8232 * scale_y),
-                (45.498 * scale_x, 60.8232 * scale_y),
-                (59.084 * scale_x, 47.258 * scale_y),
-                # Back to start
-                (59.084 * scale_x, 13.5652 * scale_y),
-            ]
-            
-            # Inner shapes (the holes in the logo)
-            inner_shape1 = [
-                (180 * scale_x, 192.834 * scale_y),
-                (180 * scale_x, 225.612 * scale_y),
-                (193.586 * scale_x, 239.177 * scale_y),
-                (227.069 * scale_x, 239.177 * scale_y),
-                (235.565 * scale_x, 235.663 * scale_y),
-                (239.084 * scale_x, 227.181 * scale_y),
-                (239.084 * scale_x, 192.834 * scale_y),
-                (225.498 * scale_x, 179.268 * scale_y),
-                (193.586 * scale_x, 179.268 * scale_y),
-                (180 * scale_x, 192.834 * scale_y),
-            ]
-            
-            inner_shape2 = [
-                (119.084 * scale_x, 135.212 * scale_y),
-                (119.084 * scale_x, 164.788 * scale_y),
-                (132.67 * scale_x, 178.354 * scale_y),
-                (164.582 * scale_x, 178.354 * scale_y),
-                (178.168 * scale_x, 164.788 * scale_y),
-                (178.168 * scale_x, 135.212 * scale_y),
-                (164.582 * scale_x, 121.646 * scale_y),
-                (132.67 * scale_x, 121.646 * scale_y),
-                (119.084 * scale_x, 135.212 * scale_y),
-            ]
-            
-            # Draw the shapes with the specified color
-            draw.polygon(outer_shape, fill=(*color, 255))
-            draw.polygon(inner_shape1, fill=(0, 0, 0, 0))
-            draw.polygon(inner_shape2, fill=(0, 0, 0, 0))
+            # Add a simple inner circle
+            center = width / 2
+            radius = width * 0.25
+            draw.ellipse(
+                [(center - radius, center - radius), 
+                 (center + radius, center + radius)],
+                fill=(0, 0, 0, 0)
+            )
     
     except Exception as e:
         st.error(f"Error processing SVG: {e}")
@@ -286,20 +223,48 @@ def main():
                 
                 if logo is None:
                     st.error("Failed to process the logo. Using fallback method.")
-                    # Fallback to the built-in logo creation
+                    # Fallback to a simple shape
                     logo = Image.new("RGBA", (300, 300), (0, 0, 0, 0))
                     draw = ImageDraw.Draw(logo)
                     
-                    # Draw a simple colored circle as fallback
-                    draw.ellipse([(50, 50), (250, 250)], fill=(*accent_color, 255))
+                    # Draw a simple rounded rectangle with a hole
+                    padding = 30  # 10% of 300
+                    draw.rounded_rectangle(
+                        [(padding, padding), (300 - padding, 300 - padding)],
+                        radius=60,
+                        fill=(*accent_color, 255)
+                    )
+                    
+                    # Add a simple inner circle
+                    center = 150
+                    radius = 75
+                    draw.ellipse(
+                        [(center - radius, center - radius), 
+                         (center + radius, center + radius)],
+                        fill=(0, 0, 0, 0)
+                    )
             else:
                 st.error("Failed to download the logo. Using fallback method.")
-                # Fallback to the built-in logo creation
+                # Fallback to a simple shape
                 logo = Image.new("RGBA", (300, 300), (0, 0, 0, 0))
                 draw = ImageDraw.Draw(logo)
                 
-                # Draw a simple colored circle as fallback
-                draw.ellipse([(50, 50), (250, 250)], fill=(*accent_color, 255))
+                # Draw a simple rounded rectangle with a hole
+                padding = 30  # 10% of 300
+                draw.rounded_rectangle(
+                    [(padding, padding), (300 - padding, 300 - padding)],
+                    radius=60,
+                    fill=(*accent_color, 255)
+                )
+                
+                # Add a simple inner circle
+                center = 150
+                radius = 75
+                draw.ellipse(
+                    [(center - radius, center - radius), 
+                     (center + radius, center + radius)],
+                    fill=(0, 0, 0, 0)
+                )
         
         # Add logo to image
         with st.spinner("Adding logo..."):
