@@ -4,8 +4,8 @@ import numpy as np
 import io
 from sklearn.cluster import KMeans
 import os
-from svglib.svglib import svg2rlg
-from reportlab.graphics import renderPM
+import xml.etree.ElementTree as ET
+import re
 
 def resize_image(image, target_size=3000):
     """Resize image to target_size x target_size without stretching"""
@@ -54,40 +54,53 @@ def get_dominant_color(image, n_colors=5):
     # Return the most dominant color (first cluster center)
     return tuple(colors[0])
 
-def convert_svg_to_png(svg_path, color, output_size=(300, 300)):
-    """Convert SVG to PNG with specified color"""
-    # Read the SVG file
-    with open(svg_path, 'r') as f:
-        svg_content = f.read()
+def create_hop_logo(color, size=(300, 300)):
+    """Create a hop logo with the specified color and size"""
+    # Create a transparent image
+    logo = Image.new("RGBA", size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(logo)
     
-    # Replace black with the specified color
-    color_hex = "#{:02x}{:02x}{:02x}".format(*color)
-    svg_content = svg_content.replace('fill="black"', f'fill="{color_hex}"')
+    # Define the hop logo shape as a simplified version
+    # This is a simplified representation of the hop logo
+    width, height = size
     
-    # Write the modified SVG to a temporary file
-    temp_svg_path = "temp_colored.svg"
-    with open(temp_svg_path, 'w') as f:
-        f.write(svg_content)
+    # Scale factors
+    scale_x = width / 300
+    scale_y = height / 300
     
-    # Convert SVG to PNG using svglib and reportlab
-    drawing = svg2rlg(temp_svg_path)
+    # Create a simplified hop logo (a filled circle with a smaller circle inside)
+    outer_radius = min(width, height) * 0.4
+    inner_radius = outer_radius * 0.5
     
-    # Create a BytesIO object to hold the PNG data
-    png_data = io.BytesIO()
-    renderPM.drawToFile(drawing, png_data, fmt="PNG")
-    png_data.seek(0)
+    # Center of the image
+    center_x = width // 2
+    center_y = height // 2
     
-    # Create PIL Image from PNG data
-    img = Image.open(png_data)
+    # Draw outer circle
+    draw.ellipse(
+        [(center_x - outer_radius, center_y - outer_radius), 
+         (center_x + outer_radius, center_y + outer_radius)], 
+        fill=(*color, 255)
+    )
     
-    # Resize to desired output size
-    if img.size != output_size:
-        img = img.resize(output_size, Image.LANCZOS)
+    # Draw inner circle (transparent)
+    draw.ellipse(
+        [(center_x - inner_radius, center_y - inner_radius), 
+         (center_x + inner_radius, center_y + inner_radius)], 
+        fill=(0, 0, 0, 0)
+    )
     
-    # Clean up temporary file
-    os.remove(temp_svg_path)
+    # Draw a smaller filled circle in the top right
+    small_radius = outer_radius * 0.3
+    small_x = center_x + outer_radius * 0.5
+    small_y = center_y - outer_radius * 0.5
+    draw.ellipse(
+        [(small_x - small_radius, small_y - small_radius), 
+         (small_x + small_radius, small_y + small_radius)], 
+        fill=(*color, 255)
+    )
     
-    return img
+    return logo
 
 def add_logo_to_image(image, logo, spacing=100):
     """Add logo to bottom right of image with specified spacing"""
@@ -133,10 +146,9 @@ def main():
             color_sample = Image.new("RGB", (100, 100), dominant_color)
             st.image(color_sample, width=100, caption="Dominant Color")
         
-        # Convert SVG to PNG with dominant color
+        # Create logo with dominant color
         with st.spinner("Preparing logo..."):
-            logo_path = "hop.svg"
-            logo = convert_svg_to_png(logo_path, dominant_color)
+            logo = create_hop_logo(dominant_color)
         
         # Add logo to image
         with st.spinner("Adding logo..."):
