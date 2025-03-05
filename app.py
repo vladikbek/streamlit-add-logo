@@ -1,335 +1,145 @@
 import streamlit as st
-from PIL import Image, ImageOps, ImageDraw, ImagePath
 import numpy as np
-import io
-from sklearn.cluster import KMeans
+from PIL import Image
 import requests
-import colorsys
+from io import BytesIO
+from sklearn.cluster import KMeans
 import base64
+import cairosvg
 
-def resize_image(image, target_size=3000):
-    """Resize image to target_size x target_size without stretching"""
-    width, height = image.size
-    
-    # Calculate the scaling factor to make the smaller dimension equal to target_size
-    scale = max(target_size / width, target_size / height)
-    
-    # Calculate new dimensions
-    new_width = int(width * scale)
-    new_height = int(height * scale)
-    
-    # Resize the image
-    resized_image = image.resize((new_width, new_height), Image.LANCZOS)
-    
-    # Create a new blank image with target dimensions
-    new_image = Image.new("RGBA" if resized_image.mode == 'RGBA' else "RGB", (target_size, target_size), (255, 255, 255))
-    
-    # Calculate position to paste (center the image)
-    paste_x = (target_size - new_width) // 2
-    paste_y = (target_size - new_height) // 2
-    
-    # Paste the resized image onto the blank canvas
-    new_image.paste(resized_image, (paste_x, paste_y))
-    
-    return new_image
+st.set_page_config(page_title="HOP Logo Adder", layout="wide")
 
-def get_accent_color(image, n_colors=10):
-    """Extract accent colors from image using K-means clustering and color analysis"""
-    # Convert image to numpy array of RGB values
-    img_array = np.array(image.convert('RGB'))
+# GitHub raw URL for the SVG logo
+LOGO_URL = "https://raw.githubusercontent.com/vladikbek/streamlit-add-logo/main/hop.svg"
+
+def get_accent_color(img):
+    """Extract a bright accent color from the image."""
+    # Resize image for faster processing
+    img_small = img.resize((100, 100))
+    # Convert to RGB if it's not
+    if img_small.mode != 'RGB':
+        img_small = img_small.convert('RGB')
     
-    # Reshape the array to be a list of RGB pixels
+    # Get image data as numpy array
+    img_array = np.array(img_small)
+    # Reshape for KMeans
     pixels = img_array.reshape(-1, 3)
     
-    # Sample pixels to speed up processing for large images
-    sample_size = min(10000, len(pixels))
-    sampled_pixels = pixels[np.random.choice(len(pixels), sample_size, replace=False)]
-    
-    # Apply K-means clustering to find color clusters
-    kmeans = KMeans(n_clusters=n_colors, random_state=0).fit(sampled_pixels)
-    
-    # Get the colors
+    # Use KMeans to find dominant colors
+    kmeans = KMeans(n_clusters=8, random_state=42, n_init=10)
+    kmeans.fit(pixels)
     colors = kmeans.cluster_centers_.astype(int)
     
-    # Convert RGB to HSV for better color analysis
-    hsv_colors = []
-    for color in colors:
-        r, g, b = color[0] / 255.0, color[1] / 255.0, color[2] / 255.0
-        h, s, v = colorsys.rgb_to_hsv(r, g, b)
-        hsv_colors.append((h, s, v, tuple(color)))
+    # Calculate brightness for each color
+    brightness = np.sum(colors, axis=1) / 3
     
-    # Filter for vibrant colors (high saturation and value, but not too bright)
-    vibrant_colors = []
-    for h, s, v, rgb in hsv_colors:
-        # Look for colors with high saturation and good brightness
-        if s > 0.4 and 0.3 < v < 0.9:
-            # Calculate a "vibrancy" score
-            vibrancy = s * v
-            vibrant_colors.append((vibrancy, rgb))
+    # Filter out dark colors (brightness < 100)
+    bright_colors = colors[brightness > 100]
     
-    # If we found vibrant colors, return the most vibrant one
-    if vibrant_colors:
-        vibrant_colors.sort(reverse=True)  # Sort by vibrancy score
-        return vibrant_colors[0][1]  # Return the RGB of the most vibrant color
+    # If no bright colors found, return the brightest one
+    if len(bright_colors) == 0:
+        return tuple(colors[np.argmax(brightness)])
     
-    # Fallback: If no vibrant colors found, find the most colorful one
-    # (avoiding very dark or very bright colors)
-    filtered_colors = []
-    for color in colors:
-        r, g, b = color
-        # Avoid very dark or very bright colors
-        brightness = (r + g + b) / 3
-        if 30 < brightness < 230:
-            # Calculate color variance as a measure of "colorfulness"
-            variance = np.var([r, g, b])
-            filtered_colors.append((variance, tuple(color)))
-    
-    if filtered_colors:
-        filtered_colors.sort(reverse=True)  # Sort by variance
-        return filtered_colors[0][1]  # Return the most "colorful" color
-    
-    # If all else fails, return the first color from kmeans
-    return tuple(colors[0])
+    # Return the brightest color
+    return tuple(bright_colors[np.argmax(np.sum(bright_colors, axis=1))])
 
-def download_svg_from_url(url):
-    """Download SVG content from URL with retries and fallbacks"""
-    # Embedded base64 SVG as last resort fallback (HoP logo)
-    HOP_SVG_BASE64 = """PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMCAwIDMwMCAzMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3
-LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMjM5LjA4NCAxMy41
-NjUyQzIzOS4wODQgNi4wNzMzNSAyMzMuMDAxIDAgMjI1LjQ5OCAwSDcyLjY2OTlDNjUuMTY2NiAwIDU5LjA4NCA2LjA3MzM3IDU5LjA4NCAx
-My41NjUyVjQ3LjI1OEM1OS4wODQgNTQuNzQ5OCA1My4wMDEzIDYwLjgyMzIgNDUuNDk4IDYwLjgyMzJIMTMuNTg1OUM2LjA4MjYzIDYwLjgy
-MzIgMCA2Ni44OTY1IDAgNzQuMzg4NFYyMjUuNjEyQzAgMjMzLjEwMyA2LjA4MjYzIDIzOS4xNzcgMTMuNTg1OSAyMzkuMTc3SDEwNS40OThD
-MTEzLjAwMSAyMzkuMTc3IDExOS4wODQgMjQ1LjI1IDExOS4wODQgMjUyLjc0MlYyODYuNDM1QzExOS4wODQgMjkzLjkyNyAxMjUuMTY3IDMw
-MCAxMzIuNjcgMzAwSDIyNS40OThDMjMzLjAwMSAzMDAgMjM5LjA4NCAyOTMuOTI3IDIzOS4wODQgMjg2LjQzNVYyNTMuNDIxQzIzOS4wODQg
-MjQ5LjgyMyAyNDAuNTE1IDI0Ni4zNzMgMjQzLjA2MyAyNDMuODI5TDI0My43NDMgMjQzLjE1QzI0Ni4yOTEgMjQwLjYwNiAyNDkuNzQ3IDIz
-OS4xNzcgMjUzLjM1IDIzOS4xNzdIMjg2LjQxNEMyOTMuOTE3IDIzOS4xNzcgMzAwIDIzMy4xMDMgMzAwIDIyNS42MTJWMTkxLjkxOUMzMDAg
-MTg0LjQyNyAyOTMuOTE3IDE3OC4zNTQgMjg2LjQxNCAxNzguMzU0SDI1Mi42N0MyNDUuMTY3IDE3OC4zNTQgMjM5LjA4NCAxNzIuMjggMjM5
-LjA4NCAxNjQuNzg4TDIzOS4wODQgMTM1LjIxMkMyMzkuMDg0IDEyNy43MiAyNDUuMTY3IDEyMS42NDYgMjUyLjY3IDEyMS42NDZIMjg2LjQx
-NEMyOTMuOTE3IDEyMS42NDYgMzAwIDExNS41NzMgMzAwIDEwOC4wODFWNzQuMzg4NEMzMDAgNjYuODk2NSAyOTMuOTE3IDYwLjgyMzIgMjg2
-LjQxNCA2MC44MjMySDI1Mi42N0MyNDUuMTY3IDYwLjgyMzIgMjM5LjA4NCA1NC43NDk4IDIzOS4wODQgNDcuMjU3OVYxMy41NjUyWk0yMzUu
-NTY1IDIzNS42NjNDMjM3LjgxOCAyMzMuNDEzIDIzOS4wODQgMjMwLjM2MiAyMzkuMDg0IDIyNy4xODFMMjM5LjA4NCAxOTIuODM0QzIzOS4w
-ODQgMTg1LjM0MiAyMzMuMDAxIDE3OS4yNjggMjI1LjQ5OCAxNzkuMjY4SDE5My41ODZDMTg2LjA4MyAxNzkuMjY4IDE4MCAxODUuMzQyIDE4
-MCAxOTIuODM0VjIyNS42MTJDMTgwIDIzMy4xMDMgMTg2LjA4MyAyMzkuMTc3IDE5My41ODYgMjM5LjE3N0gyMjcuMDY5QzIzMC4yNTYgMjM5
-LjE3NyAyMzMuMzEyIDIzNy45MTMgMjM1LjU2NSAyMzUuNjYzWk0xNjQuNTgyIDE3OC4zNTRDMTcyLjA4NSAxNzguMzU0IDE3OC4xNjggMTcy
-LjI4IDE3OC4xNjggMTY0Ljc4OFYxMzUuMjEyQzE3OC4xNjggMTI3LjcyIDE3Mi4wODUgMTIxLjY0NiAxNjQuNTgyIDEyMS42NDZIMTMyLjY3
-QzEyNS4xNjcgMTIxLjY0NiAxMTkuMDg0IDEyNy43MiAxMTkuMDg0IDEzNS4yMTJWMTY0Ljc4OEMxMTkuMDg0IDE3Mi4yOCAxMjUuMTY3IDE3
-OC4zNTQgMTMyLjY3IDE3OC4zNTRIMTY0LjU4MloiIGZpbGw9ImJsYWNrIi8+Cjwvc3ZnPgo="""
-    
-    # List of fallback URLs to try
-    fallback_urls = [
-        url,  # Try the original URL first
-        "https://raw.githubusercontent.com/vladikbek/streamlit-add-logo/main/hop.svg",  # GitHub fallback
-        "https://cdn.jsdelivr.net/gh/vladikbek/streamlit-add-logo@main/hop.svg"  # CDN fallback
-    ]
-    
-    # Try each URL with retries
-    for attempt_url in fallback_urls:
-        try:
-            st.info(f"Attempting to download SVG from: {attempt_url}")
-            # Configure the request with a timeout and multiple retries
-            session = requests.Session()
-            session.mount('https://', requests.adapters.HTTPAdapter(max_retries=3))
-            
-            response = session.get(attempt_url, timeout=10)
-            response.raise_for_status()  # Raise an exception for HTTP errors
-            
-            st.success(f"Successfully downloaded SVG from: {attempt_url}")
-            return response.text
-        except Exception as e:
-            st.warning(f"Failed to download from {attempt_url}: {e}")
-            continue  # Try the next URL
-    
-    # If all URLs fail, use the embedded SVG
-    st.warning("Using embedded SVG as fallback")
-    try:
-        svg_content = base64.b64decode(HOP_SVG_BASE64).decode('utf-8')
-        return svg_content
-    except Exception as e:
-        st.error(f"Error decoding embedded SVG: {e}")
-        return None
-
-def create_colored_svg(svg_content, color):
-    """Replace black color in SVG with the specified color"""
-    if svg_content:
-        # Convert RGB to hex
-        color_hex = "#{:02x}{:02x}{:02x}".format(*color)
-        # Replace black with the specified color
-        # This assumes the SVG uses fill="black" for the main shape
-        colored_svg = svg_content.replace('fill="black"', f'fill="{color_hex}"')
-        return colored_svg
-    return None
-
-def svg_to_png(svg_content, size=(300, 300)):
-    """Convert SVG content to PNG using cairosvg or fallback to PIL"""
-    if not svg_content:
+def create_colored_logo(color):
+    """Create a colored logo image using cairosvg."""
+    # Download the SVG
+    response = requests.get(LOGO_URL)
+    if response.status_code != 200:
+        st.error("Failed to download logo from GitHub")
         return None
     
-    try:
-        # Use cairosvg if available (better quality)
-        try:
-            import cairosvg
-            png_data = cairosvg.svg2png(
-                bytestring=svg_content.encode('utf-8'),
-                output_width=size[0],
-                output_height=size[1]
-            )
-            logo = Image.open(io.BytesIO(png_data))
-        except ImportError:
-            # Fallback to a simple generic shape
-            logo = Image.new("RGBA", size, (0, 0, 0, 0))
-            draw = ImageDraw.Draw(logo)
-            
-            # Draw a simple shape with the accent color
-            width, height = size
-            padding = width * 0.1  # 10% padding
-            
-            # Draw a rounded rectangle
-            draw.rounded_rectangle(
-                [(padding, padding), (width - padding, height - padding)],
-                radius=width * 0.2,
-                fill=(*color, 255)
-            )
-            
-            # Add a simple inner circle
-            center = width / 2
-            radius = width * 0.25
-            draw.ellipse(
-                [(center - radius, center - radius), 
-                 (center + radius, center + radius)],
-                fill=(0, 0, 0, 0)
-            )
+    # Convert RGB color to hex
+    hex_color = "#{:02x}{:02x}{:02x}".format(*color)
     
-    except Exception as e:
-        st.error(f"Error processing SVG: {e}")
-        return None
+    # Replace the fill color in the SVG
+    svg_content = response.text.replace('fill="black"', f'fill="{hex_color}"')
+    
+    # Convert SVG to PNG using cairosvg
+    png_data = cairosvg.svg2png(bytestring=svg_content.encode('utf-8'), 
+                               output_width=300, 
+                               output_height=300)
+    
+    # Create PIL Image from PNG data
+    logo = Image.open(BytesIO(png_data))
     
     return logo
 
-def add_logo_to_image(image, logo, spacing=100):
-    """Add logo to bottom right of image with specified spacing"""
-    # Ensure image has alpha channel
-    if image.mode != 'RGBA':
-        image = image.convert('RGBA')
+def process_image(uploaded_file):
+    """Process the uploaded image and add the logo."""
+    # Open the uploaded image
+    image = Image.open(uploaded_file)
     
-    # Calculate position for logo
-    position = (image.width - logo.width - spacing, image.height - logo.height - spacing)
+    # Get the original aspect ratio
+    width, height = image.size
+    aspect_ratio = width / height
     
-    # Create a copy of the image
-    result = image.copy()
+    # Calculate new dimensions for 3000x3000 canvas
+    if aspect_ratio > 1:  # Wider than tall
+        new_width = 3000
+        new_height = int(3000 / aspect_ratio)
+    else:  # Taller than wide
+        new_height = 3000
+        new_width = int(3000 * aspect_ratio)
     
-    # Paste logo onto image, using the logo's alpha channel as mask
-    result.paste(logo, position, logo)
+    # Resize the image while maintaining aspect ratio
+    resized_image = image.resize((new_width, new_height), Image.LANCZOS)
     
-    # Convert back to RGB for JPG output
-    if result.mode == 'RGBA':
-        result = result.convert('RGB')
+    # Create a 3000x3000 canvas with white background
+    canvas = Image.new('RGB', (3000, 3000), (255, 255, 255))
     
-    return result
+    # Paste the resized image in the center of the canvas
+    paste_x = (3000 - new_width) // 2
+    paste_y = (3000 - new_height) // 2
+    canvas.paste(resized_image, (paste_x, paste_y))
+    
+    # Get accent color from the image
+    accent_color = get_accent_color(canvas)
+    
+    # Create a colored logo
+    logo = create_colored_logo(accent_color)
+    if not logo:
+        return None
+    
+    # Calculate position for logo (100px from bottom and right)
+    logo_position = (3000 - 300 - 100, 3000 - 300 - 100)
+    
+    # Paste the logo onto the canvas
+    canvas.paste(logo, logo_position, logo)
+    
+    return canvas
+
+def get_image_download_link(img, filename="processed_image.jpg", text="Download Processed Image"):
+    """Generate a download link for the processed image."""
+    buffered = BytesIO()
+    img.save(buffered, format="JPEG", quality=90)
+    img_str = base64.b64encode(buffered.getvalue()).decode()
+    href = f'<a href="data:image/jpeg;base64,{img_str}" download="{filename}">{text}</a>'
+    return href
 
 def main():
-    st.title("Image Processor with Logo")
-    st.write("Upload an image to resize it to 3000x3000 and add a logo")
-    
-    # Logo URL input
-    logo_url = st.text_input("Enter logo URL (SVG format)", "https://houseofphonk.com/hop.svg")
+    st.title("HOP Logo Image Processor")
     
     uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
     
     if uploaded_file is not None:
-        # Load the image
-        image = Image.open(uploaded_file)
+        # Process the image
+        with st.spinner("Processing image..."):
+            processed_image = process_image(uploaded_file)
         
-        # Display original image
-        st.subheader("Original Image")
-        st.image(image, use_column_width=True)
-        
-        # Resize image
-        with st.spinner("Resizing image..."):
-            resized_image = resize_image(image)
-        
-        # Get accent color
-        with st.spinner("Extracting accent color..."):
-            accent_color = get_accent_color(resized_image)
-            st.write(f"Accent color: RGB{accent_color}")
+        if processed_image:
+            # Display the processed image
+            st.image(processed_image, caption="Processed Image", use_column_width=True)
             
-            # Display color sample
-            color_sample = Image.new("RGB", (100, 100), accent_color)
-            st.image(color_sample, width=100, caption="Accent Color")
-        
-        # Download and prepare logo
-        with st.spinner("Preparing logo..."):
-            # Download SVG from URL
-            svg_content = download_svg_from_url(logo_url)
-            
-            if svg_content:
-                # Create colored SVG
-                colored_svg = create_colored_svg(svg_content, accent_color)
-                
-                # Convert SVG to PNG
-                logo = svg_to_png(colored_svg)
-                
-                if logo is None:
-                    st.error("Failed to process the logo. Using fallback method.")
-                    # Fallback to a simple shape
-                    logo = Image.new("RGBA", (300, 300), (0, 0, 0, 0))
-                    draw = ImageDraw.Draw(logo)
-                    
-                    # Draw a simple rounded rectangle with a hole
-                    padding = 30  # 10% of 300
-                    draw.rounded_rectangle(
-                        [(padding, padding), (300 - padding, 300 - padding)],
-                        radius=60,
-                        fill=(*accent_color, 255)
-                    )
-                    
-                    # Add a simple inner circle
-                    center = 150
-                    radius = 75
-                    draw.ellipse(
-                        [(center - radius, center - radius), 
-                         (center + radius, center + radius)],
-                        fill=(0, 0, 0, 0)
-                    )
-            else:
-                st.error("Failed to download the logo. Using fallback method.")
-                # Fallback to a simple shape
-                logo = Image.new("RGBA", (300, 300), (0, 0, 0, 0))
-                draw = ImageDraw.Draw(logo)
-                
-                # Draw a simple rounded rectangle with a hole
-                padding = 30  # 10% of 300
-                draw.rounded_rectangle(
-                    [(padding, padding), (300 - padding, 300 - padding)],
-                    radius=60,
-                    fill=(*accent_color, 255)
-                )
-                
-                # Add a simple inner circle
-                center = 150
-                radius = 75
-                draw.ellipse(
-                    [(center - radius, center - radius), 
-                     (center + radius, center + radius)],
-                    fill=(0, 0, 0, 0)
-                )
-        
-        # Add logo to image
-        with st.spinner("Adding logo..."):
-            final_image = add_logo_to_image(resized_image, logo)
-        
-        # Display final image
-        st.subheader("Processed Image")
-        st.image(final_image, use_column_width=True)
-        
-        # Allow downloading the processed image as JPG
-        buf = io.BytesIO()
-        final_image.save(buf, format="JPEG", quality=95)
-        st.download_button(
-            label="Download Processed Image",
-            data=buf.getvalue(),
-            file_name="processed_image.jpg",
-            mime="image/jpeg"
-        )
+            # Provide download link
+            st.markdown(
+                get_image_download_link(processed_image),
+                unsafe_allow_html=True
+            )
+        else:
+            st.error("Error processing the image. Please try again.")
 
 if __name__ == "__main__":
     main() 

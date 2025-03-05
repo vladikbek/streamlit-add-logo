@@ -1,44 +1,37 @@
-# Image Processor with Logo
+# Streamlit HOP Logo Image Processor
 
-A Streamlit app that processes images by:
-1. Resizing them to 3000x3000 pixels (without stretching)
-2. Adding the Hop logo to the bottom right corner
-3. Matching the logo color to the dominant color in the image
+A simple Streamlit application that processes images by:
+1. Resizing them to fit within a 3000x3000 canvas while maintaining aspect ratio
+2. Extracting a bright accent color from the image
+3. Adding a colored HOP logo to the bottom right corner
+4. Providing a download option for the processed image
 
 ## Features
 
-- Upload JPG or PNG images
-- Automatic resizing to 3000x3000 (preserving aspect ratio)
-- Logo placement with 100px spacing from bottom and right edges
-- Color matching between logo and image
-- Download processed images
+- Upload any image (JPG, JPEG, PNG)
+- Automatic image resizing to 3000x3000 while maintaining aspect ratio
+- Intelligent accent color extraction from the image
+- Dynamic logo coloring based on the extracted accent color
+- One-click download of the processed image
 
-## Installation
+## How to Use
 
-1. Clone this repository
-2. Install the required dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
+1. Upload an image using the file uploader
+2. Wait for the image to be processed
+3. View the processed image with the HOP logo added
+4. Click the "Download Processed Image" link to save the result
 
-## Usage
+## Technical Details
 
-1. Run the Streamlit app:
-   ```
-   streamlit run app.py
-   ```
-2. Open your web browser to the URL displayed in the terminal (typically http://localhost:8501)
-3. Upload an image using the file uploader
-4. View the processed image and download it if desired
-
-## Requirements
-
-- Python 3.7+
-- Streamlit
-- Pillow
-- NumPy
-- scikit-learn
+- Built with Streamlit, Pillow, and scikit-learn
+- Uses K-means clustering to extract dominant colors
+- Dynamically colors the SVG logo using cairosvg
+- Maintains image quality throughout the processing
 
 ## Deployment
 
-This app is ready for deployment to Streamlit Cloud. The logo is embedded directly in the code, so there are no external file dependencies. 
+This app is designed to be deployed on Streamlit Cloud.
+
+## Requirements
+
+See `requirements.txt` for a list of dependencies. 
