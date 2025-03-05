@@ -1,5 +1,5 @@
 import streamlit as st
-from PIL import Image, ImageOps, ImageDraw
+from PIL import Image, ImageOps, ImageDraw, ImagePath
 import numpy as np
 import io
 from sklearn.cluster import KMeans
@@ -60,45 +60,90 @@ def create_hop_logo(color, size=(300, 300)):
     logo = Image.new("RGBA", size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(logo)
     
-    # Define the hop logo shape as a simplified version
-    # This is a simplified representation of the hop logo
+    # Get the width and height
     width, height = size
     
-    # Scale factors
+    # Create a more accurate representation of the hop logo using paths
+    # This is based on the SVG path data from the original hop.svg
+    
+    # Scale the coordinates to fit the desired size
     scale_x = width / 300
     scale_y = height / 300
     
-    # Create a simplified hop logo (a filled circle with a smaller circle inside)
-    outer_radius = min(width, height) * 0.4
-    inner_radius = outer_radius * 0.5
+    # Main outer shape
+    outer_shape = [
+        # Top left corner
+        (59.084 * scale_x, 13.5652 * scale_y),
+        # Top edge to right corner
+        (239.084 * scale_x, 13.5652 * scale_y),
+        # Right edge down to first indent
+        (239.084 * scale_x, 47.258 * scale_y),
+        # Right indent
+        (252.67 * scale_x, 47.258 * scale_y),
+        (252.67 * scale_x, 60.8232 * scale_y),
+        (286.414 * scale_x, 60.8232 * scale_y),
+        (286.414 * scale_x, 74.3884 * scale_y),
+        (286.414 * scale_x, 108.081 * scale_y),
+        (286.414 * scale_x, 121.646 * scale_y),
+        (252.67 * scale_x, 121.646 * scale_y),
+        (239.084 * scale_x, 121.646 * scale_y),
+        (239.084 * scale_x, 135.212 * scale_y),
+        (239.084 * scale_x, 164.788 * scale_y),
+        (239.084 * scale_x, 178.354 * scale_y),
+        (252.67 * scale_x, 178.354 * scale_y),
+        (286.414 * scale_x, 178.354 * scale_y),
+        (286.414 * scale_x, 191.919 * scale_y),
+        (286.414 * scale_x, 225.612 * scale_y),
+        (286.414 * scale_x, 239.177 * scale_y),
+        (253.35 * scale_x, 239.177 * scale_y),
+        (243.743 * scale_x, 243.15 * scale_y),
+        (239.084 * scale_x, 253.421 * scale_y),
+        (239.084 * scale_x, 286.435 * scale_y),
+        (225.498 * scale_x, 300 * scale_y),
+        (132.67 * scale_x, 300 * scale_y),
+        (119.084 * scale_x, 286.435 * scale_y),
+        (119.084 * scale_x, 252.742 * scale_y),
+        (105.498 * scale_x, 239.177 * scale_y),
+        (13.5859 * scale_x, 239.177 * scale_y),
+        (0 * scale_x, 225.612 * scale_y),
+        (0 * scale_x, 74.3884 * scale_y),
+        (13.5859 * scale_x, 60.8232 * scale_y),
+        (45.498 * scale_x, 60.8232 * scale_y),
+        (59.084 * scale_x, 47.258 * scale_y),
+        # Back to start
+        (59.084 * scale_x, 13.5652 * scale_y),
+    ]
     
-    # Center of the image
-    center_x = width // 2
-    center_y = height // 2
+    # Inner shapes (the holes in the logo)
+    inner_shape1 = [
+        (180 * scale_x, 192.834 * scale_y),
+        (180 * scale_x, 225.612 * scale_y),
+        (193.586 * scale_x, 239.177 * scale_y),
+        (227.069 * scale_x, 239.177 * scale_y),
+        (235.565 * scale_x, 235.663 * scale_y),
+        (239.084 * scale_x, 227.181 * scale_y),
+        (239.084 * scale_x, 192.834 * scale_y),
+        (225.498 * scale_x, 179.268 * scale_y),
+        (193.586 * scale_x, 179.268 * scale_y),
+        (180 * scale_x, 192.834 * scale_y),
+    ]
     
-    # Draw outer circle
-    draw.ellipse(
-        [(center_x - outer_radius, center_y - outer_radius), 
-         (center_x + outer_radius, center_y + outer_radius)], 
-        fill=(*color, 255)
-    )
+    inner_shape2 = [
+        (119.084 * scale_x, 135.212 * scale_y),
+        (119.084 * scale_x, 164.788 * scale_y),
+        (132.67 * scale_x, 178.354 * scale_y),
+        (164.582 * scale_x, 178.354 * scale_y),
+        (178.168 * scale_x, 164.788 * scale_y),
+        (178.168 * scale_x, 135.212 * scale_y),
+        (164.582 * scale_x, 121.646 * scale_y),
+        (132.67 * scale_x, 121.646 * scale_y),
+        (119.084 * scale_x, 135.212 * scale_y),
+    ]
     
-    # Draw inner circle (transparent)
-    draw.ellipse(
-        [(center_x - inner_radius, center_y - inner_radius), 
-         (center_x + inner_radius, center_y + inner_radius)], 
-        fill=(0, 0, 0, 0)
-    )
-    
-    # Draw a smaller filled circle in the top right
-    small_radius = outer_radius * 0.3
-    small_x = center_x + outer_radius * 0.5
-    small_y = center_y - outer_radius * 0.5
-    draw.ellipse(
-        [(small_x - small_radius, small_y - small_radius), 
-         (small_x + small_radius, small_y + small_radius)], 
-        fill=(*color, 255)
-    )
+    # Draw the shapes
+    draw.polygon(outer_shape, fill=(*color, 255))
+    draw.polygon(inner_shape1, fill=(0, 0, 0, 0))
+    draw.polygon(inner_shape2, fill=(0, 0, 0, 0))
     
     return logo
 

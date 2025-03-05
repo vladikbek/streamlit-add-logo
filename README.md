@@ -38,8 +38,7 @@ A Streamlit app that processes images by:
 - Pillow
 - NumPy
 - scikit-learn
-- CairoSVG
 
-## Note
+## Deployment
 
-The app requires the `hop.svg` file to be in the same directory as `app.py`. 
+This app is ready for deployment to Streamlit Cloud. The logo is embedded directly in the code, so there are no external file dependencies. 
