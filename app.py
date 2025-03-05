@@ -1,11 +1,10 @@
 import streamlit as st
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
 import requests
 from io import BytesIO
 from sklearn.cluster import KMeans
 import base64
-import cairosvg
 
 st.set_page_config(page_title="HOP Logo Adder", layout="wide")
 
@@ -43,27 +42,65 @@ def get_accent_color(img):
     # Return the brightest color
     return tuple(bright_colors[np.argmax(np.sum(bright_colors, axis=1))])
 
-def create_colored_logo(color):
-    """Create a colored logo image using cairosvg."""
-    # Download the SVG
-    response = requests.get(LOGO_URL)
-    if response.status_code != 200:
-        st.error("Failed to download logo from GitHub")
-        return None
+def create_colored_logo(color, size=(300, 300)):
+    """Create a colored logo image using PIL."""
+    # Create a transparent background
+    logo = Image.new('RGBA', size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(logo)
     
-    # Convert RGB color to hex
-    hex_color = "#{:02x}{:02x}{:02x}".format(*color)
+    # Draw a more accurate representation of the HOP logo
+    # Based on the SVG path but simplified for PIL
     
-    # Replace the fill color in the SVG
-    svg_content = response.text.replace('fill="black"', f'fill="{hex_color}"')
+    # Main outer shape - rounded rectangle
+    padding = 20
+    radius = 30
     
-    # Convert SVG to PNG using cairosvg
-    png_data = cairosvg.svg2png(bytestring=svg_content.encode('utf-8'), 
-                               output_width=300, 
-                               output_height=300)
+    # Draw the main shape with the accent color
+    # Top-left corner
+    draw.pieslice([padding, padding, padding + 2 * radius, padding + 2 * radius], 
+                  180, 270, fill=color + (255,))
+    # Top-right corner
+    draw.pieslice([size[0] - padding - 2 * radius, padding, 
+                  size[0] - padding, padding + 2 * radius], 
+                  270, 0, fill=color + (255,))
+    # Bottom-right corner
+    draw.pieslice([size[0] - padding - 2 * radius, size[1] - padding - 2 * radius, 
+                  size[0] - padding, size[1] - padding], 
+                  0, 90, fill=color + (255,))
+    # Bottom-left corner
+    draw.pieslice([padding, size[1] - padding - 2 * radius, 
+                  padding + 2 * radius, size[1] - padding], 
+                  90, 180, fill=color + (255,))
     
-    # Create PIL Image from PNG data
-    logo = Image.open(BytesIO(png_data))
+    # Rectangles to connect the corners
+    draw.rectangle([padding + radius, padding, size[0] - padding - radius, padding + radius], 
+                  fill=color + (255,))  # Top
+    draw.rectangle([size[0] - padding - radius, padding + radius, 
+                   size[0] - padding, size[1] - padding - radius], 
+                  fill=color + (255,))  # Right
+    draw.rectangle([padding + radius, size[1] - padding - radius, 
+                   size[0] - padding - radius, size[1] - padding], 
+                  fill=color + (255,))  # Bottom
+    draw.rectangle([padding, padding + radius, 
+                   padding + radius, size[1] - padding - radius], 
+                  fill=color + (255,))  # Left
+    
+    # Fill the center
+    draw.rectangle([padding + radius, padding + radius, 
+                   size[0] - padding - radius, size[1] - padding - radius], 
+                  fill=color + (255,))
+    
+    # Inner cutout for the "H" shape
+    inner_padding = 80
+    inner_size = 80
+    draw.rectangle([inner_padding, inner_padding, 
+                   inner_padding + inner_size, inner_padding + inner_size], 
+                  fill=(0, 0, 0, 0))
+    
+    # Inner cutout for the "O" shape
+    draw.ellipse([size[0] - inner_padding - inner_size, size[1] - inner_padding - inner_size, 
+                 size[0] - inner_padding, size[1] - inner_padding], 
+                fill=(0, 0, 0, 0))
     
     return logo
 
