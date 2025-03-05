@@ -36,4 +36,13 @@ env/
 .streamlit/
 
 # Temporary files
-temp_colored.svg 
+temp_colored.svg
+
+# macOS system files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db 
